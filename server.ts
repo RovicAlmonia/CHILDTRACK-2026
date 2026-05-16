@@ -132,6 +132,17 @@ app.get('/api/debug-tables', async (_req, res) => {
   }
 });
 
+app.get('/api/debug-columns', async (_req, res) => {
+  try {
+    const [events]    = await pool.query('DESCRIBE events');
+    const [students]  = await pool.query('DESCRIBE students');
+    const [schedules] = await pool.query('DESCRIBE student_schedules');
+    res.json({ events, students, schedules });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── 404 ──────────────────────────────────────────────────────────────────────
 app.use((_req, res) => {
   res.status(404).json({ error: 'Route not found' });
