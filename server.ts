@@ -121,6 +121,17 @@ app.get('/api/debug-db', async (_req, res) => {
   }
 });
 
+// ─── Tables Debug Route ───────────────────────────────────────────────────────
+app.get('/api/debug-tables', async (_req, res) => {
+  try {
+    const [rows] = await pool.query('SHOW TABLES');
+    res.json(rows);
+  } catch (err: any) {
+    console.error('❌ debug-tables error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── 404 ──────────────────────────────────────────────────────────────────────
 app.use((_req, res) => {
   res.status(404).json({ error: 'Route not found' });
