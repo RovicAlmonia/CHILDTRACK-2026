@@ -15,9 +15,9 @@ const pool = mysql.createPool({
   queueLimit:         0,
   timezone:           '+08:00', // Philippine Time
 
-  // SSL only in production and only when CA cert is provided
-  ...(isProduction && process.env.DB_SSL_CA
-    ? { ssl: { ca: process.env.DB_SSL_CA, rejectUnauthorized: true } }
+  // Accept self-signed certs in production (e.g. Aiven, PlanetScale, Railway)
+  ...(isProduction
+    ? { ssl: { rejectUnauthorized: false } }
     : {}),
 });
 
