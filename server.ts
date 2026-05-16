@@ -21,10 +21,12 @@ import principalRoutes           from './routes/principalRoutes';
 // ─── Middleware imports ───────────────────────────────────────────────────────
 import { errorHandler } from './middleware/errorMiddleware';
 
+// ─── DB import ────────────────────────────────────────────────────────────────
+import pool from './config/db'; // ✅ adjust path if needed
+
 const app  = express();
 const PORT = parseInt(process.env.PORT || '5000', 10);
 
-// ─── Core Middleware ──────────────────────────────────────────────────────────
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -37,26 +39,22 @@ app.use(
   })
 );
 
-// Explicit origins from env (comma-separated)
-const allowedOrigins = (process.env.CLIENT_ORIGIN || 'http://localhost:5173')
+const allowedOrigins = (
+  process.env.CLIENT_ORIGIN ||
+  'http://localhost:5173'
+)
   .split(',')
-  .map(o => o.trim())
-  .filter(Boolean);
+  .map(o => o.trim());
 
 const corsOptions = {
   origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    // Allow requests with no origin (mobile apps, Postman, curl)
-    if (!origin) return callback(null, true);
-
-    const isExplicitlyAllowed = allowedOrigins.includes(origin);
-    const isVercel            = /^https:\/\/childtrack-2026.*\.vercel\.app$/.test(origin);
-    const isLocalhost         = /^http:\/\/localhost(:\d+)?$/.test(origin);
-    const isExpo              = /^https?:\/\/.*\.exp\.direct$/.test(origin);
-
-    if (isExplicitlyAllowed || isVercel || isLocalhost || isExpo) {
+    if (
+      !origin ||
+      allowedOrigins.includes(origin) ||
+      /^https:\/\/childtrack-2026-teacher-web.*\.vercel\.app$/.test(origin)
+    ) {
       callback(null, true);
     } else {
-      console.warn(`[CORS] Blocked origin: ${origin}`);
       callback(new Error(`CORS blocked: ${origin}`));
     }
   },
@@ -66,13 +64,25 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // handle preflight
+app.options('*', cors(corsOptions));
 
 app.use(morgan('dev'));
+
+// ✅ Debug middleware — logs any 500 response body to Render console
+app.use((req, res, next) => {
+  const originalJson = res.json.bind(res);
+  res.json = (body) => {
+    if (res.statusCode >= 500) {
+      console.error(`❌ 500 on ${req.method} ${req.url}:`, JSON.stringify(body));
+    }
+    return originalJson(body);
+  };
+  next();
+});
+
 app.use(express.json({ limit: '64mb' }));
 app.use(express.urlencoded({ extended: true, limit: '64mb' }));
 
-// ─── Static Files ─────────────────────────────────────────────────────────────
 app.use(
   '/uploads',
   (_req, res, next) => {
@@ -98,6 +108,17 @@ app.use('/api/principal',   principalRoutes);
 // ─── Health Check ─────────────────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// ✅ DB test route — visit this in browser to confirm DB connection
+app.get('/api/debug-db', async (_req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT 1 + 1 AS result');
+    res.json({ db: 'connected', rows });
+  } catch (err: any) {
+    console.error('❌ DB debug error:', err.message);
+    res.status(500).json({ db: 'failed', error: err.message });
+  }
 });
 
 // ─── 404 ──────────────────────────────────────────────────────────────────────
