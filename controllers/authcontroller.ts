@@ -24,7 +24,6 @@ export async function register(req: Request, res: Response): Promise<void> {
     }
 
     const hashed = await bcrypt.hash(password, 10);
-
     const [result] = await pool.execute(
       `INSERT INTO teachers (name, username, password, age, gender, section, contact, address)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -40,14 +39,10 @@ export async function register(req: Request, res: Response): Promise<void> {
       message: 'Registered successfully',
       id: (result as any).insertId,
     });
-  } // ✅ After — temporarily expose the real error
-catch (err: any) {
-  console.error('Login error:', err);
-  res.status(500).json({ 
-    error: 'Server error',
-    detail: err.message,  // ← add this temporarily
-    code:   err.code,     // ← and this
-  });
+  } catch (err: any) {
+    console.error('Register error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
 }
 
 // ─── POST /api/auth/login ─────────────────────────────────────────────────────
@@ -66,7 +61,6 @@ export async function login(req: Request, res: Response): Promise<void> {
     ) as any[];
 
     const teacher = (rows as any[])[0];
-
     if (!teacher) {
       res.status(401).json({ error: 'Invalid username or password' });
       return;
@@ -79,19 +73,22 @@ export async function login(req: Request, res: Response): Promise<void> {
     }
 
     const token = signToken({ id: teacher.id, username: teacher.username });
-
     res.json({
       token,
       teacher: {
-        id:            teacher.id,
-        name:          teacher.name,
-        username:      teacher.username,
-        section:       teacher.section,
-        photo_base64:  teacher.photo_base64 ?? null,
+        id:        teacher.id,
+        name:      teacher.name,
+        username:  teacher.username,
+        section:   teacher.section,
+        photo_url: teacher.photo_url ?? null,
       },
     });
   } catch (err: any) {
     console.error('Login error:', err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({
+      error:  'Server error',
+      detail: err.message,
+      code:   err.code,
+    });
   }
 }
