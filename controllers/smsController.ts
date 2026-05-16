@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { SerialPort } from 'serialport';
+// import { SerialPort } from 'serialport'; // disabled in production
 import { EventEmitter } from 'events';
 
 // ─────────────────────────────────────────
