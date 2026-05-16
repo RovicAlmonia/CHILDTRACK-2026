@@ -39,6 +39,11 @@ export async function getAllEvents(req: Request, res: Response): Promise<void> {
       offset = '0',
     } = req.query as Record<string, string>;
 
+    // Sanitize limit/offset to safe integers and embed directly in SQL
+    // mysql2 does not support LIMIT/OFFSET as prepared statement params
+    const safeLimit  = Math.min(Math.max(parseInt(limit)  || 100, 1), 500);
+    const safeOffset = Math.max(parseInt(offset) || 0, 0);
+
     let sql            = 'SELECT * FROM events WHERE 1=1';
     const params: any[] = [];
 
@@ -53,8 +58,9 @@ export async function getAllEvents(req: Request, res: Response): Promise<void> {
       const like = `%${search}%`;
       params.push(like, like, like, like);
     }
-    sql += ' ORDER BY scheduled_at ASC LIMIT ? OFFSET ?';
-    params.push(Number(limit), Number(offset));
+
+    // Embed limit/offset directly — safe because they are parseInt'd integers
+    sql += ` ORDER BY scheduled_at ASC LIMIT ${safeLimit} OFFSET ${safeOffset}`;
 
     const [rows] = await pool.execute(sql, params) as any[];
     res.json(rows);
@@ -207,6 +213,9 @@ export async function getAllNotifications(req: Request, res: Response): Promise<
       offset = '0',
     } = req.query as Record<string, string>;
 
+    const safeLimit  = Math.min(Math.max(parseInt(limit)  || 200, 1), 1000);
+    const safeOffset = Math.max(parseInt(offset) || 0, 0);
+
     let sql            = 'SELECT * FROM attendance_notifications WHERE 1=1';
     const params: any[] = [];
 
@@ -235,8 +244,7 @@ export async function getAllNotifications(req: Request, res: Response): Promise<
       params.push(`%${search}%`);
     }
 
-    sql += ' ORDER BY date DESC, created_at DESC LIMIT ? OFFSET ?';
-    params.push(Number(limit), Number(offset));
+    sql += ` ORDER BY date DESC, created_at DESC LIMIT ${safeLimit} OFFSET ${safeOffset}`;
 
     const [rows] = await pool.execute(sql, params) as any[];
     res.json(rows);
@@ -293,6 +301,9 @@ export async function getPersistentNotifications(req: Request, res: Response): P
       offset = '0',
     } = req.query as Record<string, string>;
 
+    const safeLimit  = Math.min(Math.max(parseInt(limit)  || 50, 1), 500);
+    const safeOffset = Math.max(parseInt(offset) || 0, 0);
+
     let sql            = 'SELECT * FROM notifications WHERE 1=1';
     const params: any[] = [];
 
@@ -309,8 +320,7 @@ export async function getPersistentNotifications(req: Request, res: Response): P
       params.push(type);
     }
 
-    sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
-    params.push(Number(limit), Number(offset));
+    sql += ` ORDER BY created_at DESC LIMIT ${safeLimit} OFFSET ${safeOffset}`;
 
     const [rows] = await pool.execute(sql, params) as any[];
     res.json(rows);
