@@ -37,22 +37,26 @@ app.use(
   })
 );
 
-const allowedOrigins = (
-  process.env.CLIENT_ORIGIN ||
-  'http://localhost:5173'
-)
+// Explicit origins from env (comma-separated)
+const allowedOrigins = (process.env.CLIENT_ORIGIN || 'http://localhost:5173')
   .split(',')
-  .map(o => o.trim());
+  .map(o => o.trim())
+  .filter(Boolean);
 
 const corsOptions = {
   origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    if (
-      !origin ||
-      allowedOrigins.includes(origin) ||
-      /^https:\/\/childtrack-2026-teacher-web.*\.vercel\.app$/.test(origin)
-    ) {
+    // Allow requests with no origin (mobile apps, Postman, curl)
+    if (!origin) return callback(null, true);
+
+    const isExplicitlyAllowed = allowedOrigins.includes(origin);
+    const isVercel            = /^https:\/\/childtrack-2026.*\.vercel\.app$/.test(origin);
+    const isLocalhost         = /^http:\/\/localhost(:\d+)?$/.test(origin);
+    const isExpo              = /^https?:\/\/.*\.exp\.direct$/.test(origin);
+
+    if (isExplicitlyAllowed || isVercel || isLocalhost || isExpo) {
       callback(null, true);
     } else {
+      console.warn(`[CORS] Blocked origin: ${origin}`);
       callback(new Error(`CORS blocked: ${origin}`));
     }
   },
@@ -62,7 +66,7 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // ← handle preflight requests
+app.options('*', cors(corsOptions)); // handle preflight
 
 app.use(morgan('dev'));
 app.use(express.json({ limit: '64mb' }));
@@ -80,7 +84,7 @@ app.use(
 
 // ─── API Routes ───────────────────────────────────────────────────────────────
 app.use('/api/auth',        authRoutes);
-app.use('/api/teachers',    authRoutes);  // ✅ fixes PUT /api/teachers/:id and PUT /api/teachers/:id/change-password
+app.use('/api/teachers',    authRoutes);
 app.use('/api',             parentRoutes);
 app.use('/api/attendance',  attendanceRoutes);
 app.use('/api/students',    studentRoutes);
