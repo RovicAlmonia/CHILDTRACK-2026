@@ -7,7 +7,7 @@ import dotenv      from 'dotenv';
 dotenv.config();
 
 // ─── DB import ────────────────────────────────────────────────────────────────
-import pool from '../lib/db';
+import pool from './lib/db';
 
 // ─── Route imports ────────────────────────────────────────────────────────────
 import authRoutes                from './routes/authRoutes';
