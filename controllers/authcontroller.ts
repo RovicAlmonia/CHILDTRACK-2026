@@ -40,10 +40,14 @@ export async function register(req: Request, res: Response): Promise<void> {
       message: 'Registered successfully',
       id: (result as any).insertId,
     });
-  } catch (err: any) {
-    console.error('Register error:', err);
-    res.status(500).json({ error: 'Server error' });
-  }
+  } // ✅ After — temporarily expose the real error
+catch (err: any) {
+  console.error('Login error:', err);
+  res.status(500).json({ 
+    error: 'Server error',
+    detail: err.message,  // ← add this temporarily
+    code:   err.code,     // ← and this
+  });
 }
 
 // ─── POST /api/auth/login ─────────────────────────────────────────────────────
