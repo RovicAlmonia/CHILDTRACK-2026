@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import pool from '../lib/db';
 import { AuthRequest } from '../middleware/authMiddleware';
-import { notifyParentsNewEvent } from './parentNotificationsController'; // 👈 add this import
+import { notifyParentsNewEvent } from './parentNotificationsController';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -58,11 +58,11 @@ export async function getAllEvents(req: Request, res: Response): Promise<void> {
 
     const [rows] = await pool.execute(sql, params) as any[];
     res.json(rows);
-  } 
   } catch (err: any) {
     console.error('[getAllEvents]', err);
     res.status(500).json({ error: err.message, code: err.code, sql: err.sql });
   }
+}
 
 /** GET /api/events/:id */
 export async function getEventById(req: Request, res: Response): Promise<void> {
@@ -77,9 +77,9 @@ export async function getEventById(req: Request, res: Response): Promise<void> {
       return;
     }
     res.json((rows as any[])[0]);
-  } catch (err) {
+  } catch (err: any) {
     console.error('[getEventById]', err);
-    res.status(500).json({ error: 'Failed to fetch event.' });
+    res.status(500).json({ error: err.message, code: err.code, sql: err.sql });
   }
 }
 
@@ -114,14 +114,13 @@ export async function createEvent(req: AuthRequest, res: Response): Promise<void
       [(result as any).insertId],
     ) as any[];
 
-    // 👇 Notify all parents about the new event (non-blocking)
     notifyParentsNewEvent(title.trim(), description, scheduled_at, location, teacher_name)
       .catch(err => console.error('[createEvent] notifyParentsNewEvent failed:', err));
 
     res.status(201).json((rows as any[])[0]);
-  } catch (err) {
+  } catch (err: any) {
     console.error('[createEvent]', err);
-    res.status(500).json({ error: 'Failed to create event.' });
+    res.status(500).json({ error: err.message, code: err.code, sql: err.sql });
   }
 }
 
@@ -168,9 +167,9 @@ export async function updateEvent(req: AuthRequest, res: Response): Promise<void
     ) as any[];
 
     res.json((rows as any[])[0]);
-  } catch (err) {
+  } catch (err: any) {
     console.error('[updateEvent]', err);
-    res.status(500).json({ error: 'Failed to update event.' });
+    res.status(500).json({ error: err.message, code: err.code, sql: err.sql });
   }
 }
 
@@ -187,9 +186,9 @@ export async function deleteEvent(req: AuthRequest, res: Response): Promise<void
       return;
     }
     res.json({ message: 'Event deleted.' });
-  } catch (err) {
+  } catch (err: any) {
     console.error('[deleteEvent]', err);
-    res.status(500).json({ error: 'Failed to delete event.' });
+    res.status(500).json({ error: err.message, code: err.code, sql: err.sql });
   }
 }
 
@@ -241,9 +240,9 @@ export async function getAllNotifications(req: Request, res: Response): Promise<
 
     const [rows] = await pool.execute(sql, params) as any[];
     res.json(rows);
-  } catch (err) {
+  } catch (err: any) {
     console.error('[getAllNotifications]', err);
-    res.status(500).json({ error: 'Failed to fetch notifications.' });
+    res.status(500).json({ error: err.message, code: err.code, sql: err.sql });
   }
 }
 
@@ -273,9 +272,9 @@ export async function getNotificationsSummary(_req: Request, res: Response): Pro
     }
 
     res.json({ date: today, ...summary });
-  } catch (err) {
+  } catch (err: any) {
     console.error('[getNotificationsSummary]', err);
-    res.status(500).json({ error: 'Failed to fetch summary.' });
+    res.status(500).json({ error: err.message, code: err.code, sql: err.sql });
   }
 }
 
@@ -315,9 +314,9 @@ export async function getPersistentNotifications(req: Request, res: Response): P
 
     const [rows] = await pool.execute(sql, params) as any[];
     res.json(rows);
-  } catch (err) {
+  } catch (err: any) {
     console.error('[getPersistentNotifications]', err);
-    res.status(500).json({ error: 'Failed to fetch notifications.' });
+    res.status(500).json({ error: err.message, code: err.code, sql: err.sql });
   }
 }
 
@@ -334,9 +333,9 @@ export async function markNotificationRead(req: Request, res: Response): Promise
       return;
     }
     res.json({ message: 'Marked as read.' });
-  } catch (err) {
+  } catch (err: any) {
     console.error('[markNotificationRead]', err);
-    res.status(500).json({ error: 'Failed to update notification.' });
+    res.status(500).json({ error: err.message, code: err.code, sql: err.sql });
   }
 }
 
@@ -358,8 +357,8 @@ export async function markAllNotificationsRead(req: Request, res: Response): Pro
       message: 'All notifications marked as read.',
       updated: (result as any).affectedRows,
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error('[markAllNotificationsRead]', err);
-    res.status(500).json({ error: 'Failed to update notifications.' });
+    res.status(500).json({ error: err.message, code: err.code, sql: err.sql });
   }
 }
