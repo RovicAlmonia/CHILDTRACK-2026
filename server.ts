@@ -39,14 +39,18 @@ app.use(
 
 const allowedOrigins = (
   process.env.CLIENT_ORIGIN ||
-  'https://your-vercel-app.vercel.app,https://192.168.1.130:3100,https://172.20.10.14:3100/,https://192.168.222.77:3100,https://192.168.1.3:3100,https://192.168.1.13:3100,https://172.22.155.171:3100,http://localhost:5173,http://localhost:5174,http://localhost:3100,http://192.168.137.204:3100,http://192.168.x.x:3100,https://192.168.56.1:3100,http://192.168.56.x:3100,https://192.168.1.10:8081,https://192.168.1.10:3100,https://172.20.10.14:8081,https://172.20.10.14:3100,https://192.168.1.130:3100,https://192.168.1.130:5000,'
+  'http://localhost:5173'
 )
   .split(',')
   .map(o => o.trim());
 
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
+const corsOptions = {
+  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+    if (
+      !origin ||
+      allowedOrigins.includes(origin) ||
+      /^https:\/\/childtrack-2026-teacher-web.*\.vercel\.app$/.test(origin)
+    ) {
       callback(null, true);
     } else {
       callback(new Error(`CORS blocked: ${origin}`));
@@ -54,12 +58,15 @@ app.use(cors({
   },
   credentials:    true,
   methods:        ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+  allowedHeaders: ['Content-Type', 'Authorization', 'ngrok-skip-browser-warning'],
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // ← handle preflight requests
 
 app.use(morgan('dev'));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '64mb' }));
+app.use(express.urlencoded({ extended: true, limit: '64mb' }));
 
 // ─── Static Files ─────────────────────────────────────────────────────────────
 app.use(
@@ -102,6 +109,4 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 ChildTrack API running at http://localhost:${PORT}`);
 });
 
-app.use(express.json({ limit: '64mb' }));
-app.use(express.urlencoded({ extended: true, limit: '64mb' }));
 export default app;
