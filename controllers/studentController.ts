@@ -53,9 +53,9 @@ export async function getStudents(req: AuthRequest, res: Response): Promise<void
     }));
 
     res.json(students);
-  } catch (err) {
+  } catch (err: any) {
     console.error('getStudents error:', err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: err.message, code: err.code, sql: err.sql });
   }
 }
 
@@ -106,7 +106,7 @@ export async function createStudent(req: AuthRequest, res: Response): Promise<vo
       res.status(400).json({ error: 'LRN already registered' });
       return;
     }
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: err.message, code: err.code, sql: err.sql });
   } finally {
     conn.release();
   }
@@ -131,9 +131,9 @@ export async function getStudentById(req: Request, res: Response): Promise<void>
     ) as any[];
 
     res.json({ ...(students as any[])[0], parents_guardians: guardians });
-  } catch (err) {
+  } catch (err: any) {
     console.error('getStudentById error:', err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: err.message, code: err.code, sql: err.sql });
   }
 }
 
@@ -178,7 +178,7 @@ export async function activateParentAccount(req: AuthRequest, res: Response): Pr
       ) as any[];
       const parent2Name = (parent2Rows as any[]).length > 0
         ? (parent2Rows as any[])[0].name
-        : studentName; // fallback to student name if no Parent 2
+        : studentName;
       // ── Auto-create with generated credentials ───────────────────────
       const username = `parent_${lrn}`;
       const password = await bcrypt.hash(lrn, 10);
@@ -208,8 +208,8 @@ export async function activateParentAccount(req: AuthRequest, res: Response): Pr
       message:   newStatus ? 'Parent account activated' : 'Parent account deactivated',
       is_active: Boolean(newStatus),
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error('activateParentAccount error:', err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: err.message, code: err.code, sql: err.sql });
   }
 }
