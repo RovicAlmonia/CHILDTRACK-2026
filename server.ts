@@ -121,6 +121,14 @@ app.get('/api/debug-db', async (_req, res) => {
   }
 });
 
+app.get('/api/debug-events-direct', async (_req, res) => {
+  try {
+    const { getAllEvents } = await import('./controllers/notificationsEventsController');
+    res.json({ loaded: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message, stack: err.stack });
+  }
+});
 // ─── Tables Debug Route ───────────────────────────────────────────────────────
 app.get('/api/debug-tables', async (_req, res) => {
   try {
