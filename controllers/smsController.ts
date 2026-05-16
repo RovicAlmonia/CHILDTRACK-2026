@@ -1,17 +1,45 @@
 import { Request, Response } from 'express';
-// import { SerialPort } from 'serialport'; // disabled in production
 import { EventEmitter } from 'events';
+
+// ─────────────────────────────────────────
+//  SERIALPORT STUB (disabled in production)
+//  Replace with real import for local hardware use:
+//  import { SerialPort } from 'serialport';
+// ─────────────────────────────────────────
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+
+// Minimal stub so TypeScript compiles without the serialport package
+type SerialPortStub = {
+  isOpen:   boolean;
+  open:     (cb: (err: any) => void) => void;
+  close:    (cb?: (err: any) => void) => void;
+  write:    (data: string, cb: (err: any) => void) => void;
+  drain:    (cb: (err: any) => void) => void;
+  on:       (event: string, cb: (...args: any[]) => void) => void;
+};
+
+// In production this is always null; locally swap in real SerialPort
+let SerialPort: any = null;
+if (!IS_PRODUCTION) {
+  try {
+    // Dynamic require so the module is optional
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    SerialPort = require('serialport').SerialPort;
+  } catch {
+    console.warn('[SMS] serialport module not found — SMS disabled');
+  }
+}
 
 // ─────────────────────────────────────────
 //  CONFIG
 // ─────────────────────────────────────────
 const SMS_PORT                = process.env.SMS_SERIAL_PORT || 'COM4';
 const SMS_BAUD                = parseInt(process.env.SMS_BAUD_RATE || '115200', 10);
-const SMS_RESPONSE_TIMEOUT_MS = 16_000;  // 12s firmware +CMGS wait + 4s margin
-const PING_TIMEOUT_MS         = 1_500;   // 115200 is fast — tight ping window
+const SMS_RESPONSE_TIMEOUT_MS = 16_000;
+const PING_TIMEOUT_MS         = 1_500;
 const KEEPALIVE_INTERVAL_MS   = 30_000;
-const READY_WAIT_MS           = 10_000;  // ESP32 boots in ~4s + baud negotiation
-const RETRY_DELAY_MS          = 1_500;   // fast retry between queue jobs
+const READY_WAIT_MS           = 10_000;
+const RETRY_DELAY_MS          = 1_500;
 
 // ─────────────────────────────────────────
 //  TYPES
@@ -28,7 +56,7 @@ interface SMSJob {
 // ─────────────────────────────────────────
 //  STATE
 // ─────────────────────────────────────────
-let port:         SerialPort | null = null;
+let port:         SerialPortStub | null = null;
 let portReady     = false;
 let esp32Ready    = false;
 let connectingNow = false;
@@ -38,14 +66,25 @@ lineEmitter.setMaxListeners(100);
 
 let keepaliveTimer: ReturnType<typeof setInterval> | null = null;
 
-const queue:       SMSJob[] = [];
-let   jobCounter   = 0;
-let   isProcessing = false;
+const queue:     SMSJob[] = [];
+let jobCounter   = 0;
+let isProcessing = false;
+
+// ─────────────────────────────────────────
+//  GUARD — reject all ops if no hardware
+// ─────────────────────────────────────────
+function noHardware(res: Response): boolean {
+  if (IS_PRODUCTION || !SerialPort) {
+    res.status(503).json({ error: 'SMS via serial port is not available in production.' });
+    return true;
+  }
+  return false;
+}
 
 // ─────────────────────────────────────────
 //  LINE READER
 // ─────────────────────────────────────────
-function attachLineReader(p: SerialPort) {
+function attachLineReader(p: SerialPortStub) {
   p.on('data', (chunk: Buffer) => {
     lineBuffer += chunk.toString();
     let idx: number;
@@ -85,12 +124,12 @@ function waitForLine(predicate: (l: string) => boolean, timeoutMs: number): Prom
 // ─────────────────────────────────────────
 //  WRITE
 // ─────────────────────────────────────────
-function writeToPort(p: SerialPort, data: string): Promise<void> {
+function writeToPort(p: SerialPortStub, data: string): Promise<void> {
   return new Promise((resolve, reject) => {
     console.log(`[ESP32 >] ${data.trim()}`);
-    p.write(data, (err) => {
+    p.write(data, (err: any) => {
       if (err) return reject(err);
-      p.drain((e) => e ? reject(e) : resolve());
+      p.drain((e: any) => e ? reject(e) : resolve());
     });
   });
 }
@@ -98,7 +137,7 @@ function writeToPort(p: SerialPort, data: string): Promise<void> {
 // ─────────────────────────────────────────
 //  PING
 // ─────────────────────────────────────────
-async function ping(p: SerialPort): Promise<boolean> {
+async function ping(p: SerialPortStub): Promise<boolean> {
   try {
     await writeToPort(p, 'PING\n');
     await waitForLine(l => l === 'PONG', PING_TIMEOUT_MS);
@@ -111,7 +150,7 @@ async function ping(p: SerialPort): Promise<boolean> {
 // ─────────────────────────────────────────
 //  KEEPALIVE
 // ─────────────────────────────────────────
-function startKeepalive(p: SerialPort) {
+function startKeepalive(p: SerialPortStub) {
   if (keepaliveTimer) clearInterval(keepaliveTimer);
   keepaliveTimer = setInterval(async () => {
     if (!port?.isOpen || isProcessing) return;
@@ -129,9 +168,9 @@ function startKeepalive(p: SerialPort) {
 // ─────────────────────────────────────────
 //  GET PORT
 // ─────────────────────────────────────────
-let getPortPromise: Promise<SerialPort> | null = null;
+let getPortPromise: Promise<SerialPortStub> | null = null;
 
-function getPort(): Promise<SerialPort> {
+function getPort(): Promise<SerialPortStub> {
   if (port?.isOpen && portReady && esp32Ready) return Promise.resolve(port);
   if (connectingNow && getPortPromise) return getPortPromise;
 
@@ -143,7 +182,7 @@ function getPort(): Promise<SerialPort> {
   return getPortPromise;
 }
 
-function _openPort(): Promise<SerialPort> {
+function _openPort(): Promise<SerialPortStub> {
   return new Promise((resolve, reject) => {
     if (port?.isOpen) {
       port.close();
@@ -151,16 +190,15 @@ function _openPort(): Promise<SerialPort> {
     }
 
     lineBuffer = '';
-    const p = new SerialPort({ path: SMS_PORT, baudRate: SMS_BAUD, autoOpen: false });
+    const p: SerialPortStub = new SerialPort({ path: SMS_PORT, baudRate: SMS_BAUD, autoOpen: false });
 
-    p.open(async (err) => {
+    p.open(async (err: any) => {
       if (err) { port = null; return reject(new Error(`Cannot open ${SMS_PORT}: ${err.message}`)); }
 
       port = p; portReady = true;
       console.log(`[SMS] ✅ Port ${SMS_PORT} opened at ${SMS_BAUD} baud`);
       attachLineReader(p);
 
-      // Fast path — PING first, covers already-running ESP32
       const alive = await ping(p);
       if (alive) {
         esp32Ready = true;
@@ -169,7 +207,6 @@ function _openPort(): Promise<SerialPort> {
         return resolve(p);
       }
 
-      // Booting — wait for READY
       console.log('[SMS] ⏳ No PONG — waiting for READY...');
       try {
         await waitForLine(l => l === 'READY', READY_WAIT_MS);
@@ -181,7 +218,7 @@ function _openPort(): Promise<SerialPort> {
       }
     });
 
-    p.on('error', (e) => {
+    p.on('error', (e: any) => {
       console.error('[SMS] Port error:', e.message);
       port = null; portReady = false; esp32Ready = false;
     });
@@ -197,6 +234,10 @@ function _openPort(): Promise<SerialPort> {
 //  PRE-WARM
 // ─────────────────────────────────────────
 export function prewarmSMSPort(): void {
+  if (IS_PRODUCTION || !SerialPort) {
+    console.log('[SMS] Skipping pre-warm — production environment');
+    return;
+  }
   console.log('[SMS] 🔥 Pre-warming serial port...');
   getPort()
     .then(() => console.log('[SMS] 🔥 Port pre-warmed and ready'))
@@ -208,7 +249,7 @@ export function prewarmSMSPort(): void {
 // ─────────────────────────────────────────
 async function sendOneSMS(number: string, message: string): Promise<void> {
   const p = await getPort();
-  const safeMessage = message.replace(/:/g, '；'); // colons break SEND: protocol
+  const safeMessage = message.replace(/:/g, '；');
 
   await writeToPort(p, `SEND:${number}:${safeMessage}\n`);
 
@@ -278,6 +319,8 @@ function enqueueSMS(numbers: string[], message: string): SMSJob[] {
 //  POST /api/sms/send
 // ─────────────────────────────────────────
 export async function sendSMS(req: Request, res: Response): Promise<void> {
+  if (noHardware(res)) return;
+
   const { numbers, message } = req.body as { numbers: string[]; message: string };
 
   if (!Array.isArray(numbers) || numbers.length === 0) {
@@ -304,8 +347,13 @@ export async function sendSMS(req: Request, res: Response): Promise<void> {
 // ─────────────────────────────────────────
 export async function getSMSStatus(_req: Request, res: Response): Promise<void> {
   res.json({
-    portOpen: port?.isOpen ?? false, esp32Ready, isProcessing,
-    queueSize: queue.length, port: SMS_PORT, baud: SMS_BAUD,
+    portOpen:    port?.isOpen ?? false,
+    esp32Ready,
+    isProcessing,
+    queueSize:   queue.length,
+    port:        SMS_PORT,
+    baud:        SMS_BAUD,
+    available:   !IS_PRODUCTION && !!SerialPort,
     pendingJobs: queue.map(j => ({
       id: j.id, number: j.number, attempts: j.attempts,
       status: j.status, addedAt: j.addedAt,
@@ -317,6 +365,8 @@ export async function getSMSStatus(_req: Request, res: Response): Promise<void> 
 //  POST /api/sms/connect
 // ─────────────────────────────────────────
 export async function connectSMS(_req: Request, res: Response): Promise<void> {
+  if (noHardware(res)) return;
+
   if (port?.isOpen) {
     port.close(); port = null; portReady = false; esp32Ready = false;
     if (keepaliveTimer) clearInterval(keepaliveTimer);
