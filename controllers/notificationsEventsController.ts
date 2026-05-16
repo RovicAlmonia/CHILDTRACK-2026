@@ -58,11 +58,11 @@ export async function getAllEvents(req: Request, res: Response): Promise<void> {
 
     const [rows] = await pool.execute(sql, params) as any[];
     res.json(rows);
-  } catch (err) {
+  } 
+  } catch (err: any) {
     console.error('[getAllEvents]', err);
-    res.status(500).json({ error: 'Failed to fetch events.' });
+    res.status(500).json({ error: err.message, code: err.code, sql: err.sql });
   }
-}
 
 /** GET /api/events/:id */
 export async function getEventById(req: Request, res: Response): Promise<void> {
