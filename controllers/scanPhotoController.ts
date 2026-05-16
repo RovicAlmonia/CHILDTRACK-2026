@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import pool from '../lib/db';
 import { AuthRequest } from '../middleware/authMiddleware';
-import cloudinary from '../config/cloudinary';
+import cloudinary from '../src/config/cloudinary';
 
 // ─── Helper: Upload base64 image to Cloudinary ────────────────────────
 async function uploadToCloudinary(base64: string, studentName: string): Promise<string> {
