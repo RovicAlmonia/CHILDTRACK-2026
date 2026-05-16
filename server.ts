@@ -143,6 +143,15 @@ app.get('/api/debug-columns', async (_req, res) => {
   }
 });
 
+app.get('/api/debug-events-raw', async (_req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM events LIMIT 5');
+    res.json(rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── 404 ──────────────────────────────────────────────────────────────────────
 app.use((_req, res) => {
   res.status(404).json({ error: 'Route not found' });
