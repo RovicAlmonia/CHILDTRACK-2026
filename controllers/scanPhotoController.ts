@@ -1,8 +1,20 @@
 import { Response } from 'express';
-import path from 'path';
-import fs from 'fs';
 import pool from '../lib/db';
 import { AuthRequest } from '../middleware/authMiddleware';
+import cloudinary from '../config/cloudinary';
+
+// ─── Helper: Upload base64 image to Cloudinary ────────────────────────
+async function uploadToCloudinary(base64: string, studentName: string): Promise<string> {
+  const result = await cloudinary.uploader.upload(base64, {
+    folder: 'childtrack/scans',
+    public_id: `scan_${Date.now()}_${studentName.replace(/\s+/g, '_')}`,
+    transformation: [
+      { width: 800, height: 800, crop: 'limit' },
+      { quality: 'auto' },
+    ],
+  });
+  return result.secure_url;
+}
 
 // ─── POST /api/scan-photos ────────────────────────────────────────────
 export async function uploadScanPhoto(req: AuthRequest, res: Response): Promise<void> {
@@ -14,28 +26,14 @@ export async function uploadScanPhoto(req: AuthRequest, res: Response): Promise<
       return;
     }
 
-    // Ensure uploads directory exists
-    const uploadsDir = path.join(__dirname, '..', process.env.UPLOAD_DIR || 'uploads', 'scans');
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
-    }
-
-    // Clean base64 string
-    const base64Data = photo_base64.replace(/^data:image\/\w+;base64,/, '');
-    const buffer     = Buffer.from(base64Data, 'base64');
-    const filename   = `scan_${Date.now()}_${student_name.replace(/\s+/g, '_')}.jpg`;
-    const filepath   = path.join(uploadsDir, filename);
-
-    fs.writeFileSync(filepath, buffer);
-
-    const photoPath = `/uploads/scans/${filename}`;
+    const photoUrl = await uploadToCloudinary(photo_base64, student_name);
 
     await pool.execute(
       'INSERT INTO scan_photos (student_name, status, photo_path) VALUES (?, ?, ?)',
-      [student_name, status || null, photoPath]
+      [student_name, status || null, photoUrl]
     );
 
-    res.status(201).json({ message: 'Photo saved', path: photoPath });
+    res.status(201).json({ message: 'Photo saved', path: photoUrl });
   } catch (err) {
     console.error('uploadScanPhoto error:', err);
     res.status(500).json({ error: 'Server error' });
@@ -46,7 +44,7 @@ export async function uploadScanPhoto(req: AuthRequest, res: Response): Promise<
 export async function getScanPhotos(req: AuthRequest, res: Response): Promise<void> {
   try {
     const { student_name } = req.query;
-    let query  = 'SELECT * FROM scan_photos';
+    let query = 'SELECT * FROM scan_photos';
     let params: any[] = [];
 
     if (student_name) {
