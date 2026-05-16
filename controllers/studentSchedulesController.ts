@@ -26,9 +26,9 @@ export async function getStudentSchedules(req: Request, res: Response): Promise<
 
     const [rows] = await pool.execute(query, params) as any[];
     res.json(rows);
-  } catch (err) {
+  } catch (err: any) {
     console.error('getStudentSchedules error:', err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: err.message, code: err.code, sql: err.sql });
   }
 }
 
@@ -73,9 +73,9 @@ export async function createStudentSchedule(req: Request, res: Response): Promis
       id:      (result as any).insertId,
       message: 'Schedule created successfully',
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error('createStudentSchedule error:', err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: err.message, code: err.code, sql: err.sql });
   }
 }
 
@@ -123,9 +123,9 @@ export async function updateStudentSchedule(req: Request, res: Response): Promis
     }
 
     res.json({ id: Number(id), message: 'Schedule updated successfully' });
-  } catch (err) {
+  } catch (err: any) {
     console.error('updateStudentSchedule error:', err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: err.message, code: err.code, sql: err.sql });
   }
 }
 
@@ -145,8 +145,8 @@ export async function deleteStudentSchedule(req: Request, res: Response): Promis
     }
 
     res.json({ id: Number(id), message: 'Schedule deleted successfully' });
-  } catch (err) {
+  } catch (err: any) {
     console.error('deleteStudentSchedule error:', err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: err.message, code: err.code, sql: err.sql });
   }
 }
