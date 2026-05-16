@@ -13,15 +13,13 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit:    isProduction ? 20 : 10,
   queueLimit:         0,
-  timezone:           '+08:00', // Philippine Time
+  timezone:           '+08:00',
 
-  // Accept self-signed certs in production (e.g. Aiven, PlanetScale, Railway)
-  ...(isProduction
-    ? { ssl: { rejectUnauthorized: false } }
+  ...(isProduction && process.env.DB_SSL_CA
+    ? { ssl: { ca: process.env.DB_SSL_CA.replace(/\\n/g, '\n'), rejectUnauthorized: true } }
     : {}),
 });
 
-// Test connection on startup
 pool.getConnection()
   .then(conn => {
     console.log(`✅ MySQL connected successfully (${isProduction ? 'production' : 'local'})`);
