@@ -6,6 +6,9 @@ import path        from 'path';
 import dotenv      from 'dotenv';
 dotenv.config();
 
+// ─── DB import ────────────────────────────────────────────────────────────────
+import pool from '../lib/db';
+
 // ─── Route imports ────────────────────────────────────────────────────────────
 import authRoutes                from './routes/authRoutes';
 import parentRoutes              from './routes/index';
@@ -20,9 +23,6 @@ import principalRoutes           from './routes/principalRoutes';
 
 // ─── Middleware imports ───────────────────────────────────────────────────────
 import { errorHandler } from './middleware/errorMiddleware';
-
-// ─── DB import ────────────────────────────────────────────────────────────────
-import pool from './config/db'; // ✅ adjust path if needed
 
 const app  = express();
 const PORT = parseInt(process.env.PORT || '5000', 10);
@@ -68,7 +68,7 @@ app.options('*', cors(corsOptions));
 
 app.use(morgan('dev'));
 
-// ✅ Debug middleware — logs any 500 response body to Render console
+// ─── Debug middleware — logs any 500 response body to Render console ──────────
 app.use((req, res, next) => {
   const originalJson = res.json.bind(res);
   res.json = (body) => {
@@ -110,7 +110,7 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// ✅ DB test route — visit this in browser to confirm DB connection
+// ─── DB Test Route ────────────────────────────────────────────────────────────
 app.get('/api/debug-db', async (_req, res) => {
   try {
     const [rows] = await pool.query('SELECT 1 + 1 AS result');
