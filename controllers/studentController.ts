@@ -14,25 +14,25 @@ export async function getStudents(req: AuthRequest, res: Response): Promise<void
     }
 
     const [rows] = await pool.execute(
-      `SELECT
-         s.id, s.lrn, s.name, s.gender, s.created_at,
-         COALESCE(pa.is_active, 0) AS parent_is_active,
-         GROUP_CONCAT(
-           JSON_OBJECT(
-             'role',           pg.role,
-             'name',           pg.name,
-             'contact_number', pg.contact_number
-           )
-           SEPARATOR '||'
-         ) AS parents_guardians_raw
-       FROM students s
-       LEFT JOIN parents_guardians pg ON s.id = pg.student_id
-       LEFT JOIN parent_accounts pa ON s.lrn = pa.lrn
-       WHERE s.teacher_id = ?
-       GROUP BY s.id
-       ORDER BY s.name`,
-      [teacherId]
-    ) as any[];
+  `SELECT
+     s.id, s.lrn, s.name, s.gender, s.created_at,
+     COALESCE(pa.is_active, 0) AS parent_is_active,
+     GROUP_CONCAT(
+       JSON_OBJECT(
+         'role',           pg.role,
+         'name',           pg.name,
+         'contact_number', pg.contact_number
+       )
+       SEPARATOR '||'
+     ) AS parents_guardians_raw
+   FROM students s
+   LEFT JOIN parents_guardians pg ON s.id = pg.student_id
+   LEFT JOIN parent_accounts pa ON s.lrn = pa.lrn
+   WHERE s.teacher_id = ?
+   GROUP BY s.id, s.lrn, s.name, s.gender, s.created_at, pa.is_active
+   ORDER BY s.name`,
+  [teacherId]
+) as any[];
 
     const students = (rows as any[]).map((row) => ({
       id:                row.id,
