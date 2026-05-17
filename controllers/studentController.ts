@@ -213,3 +213,44 @@ export async function activateParentAccount(req: AuthRequest, res: Response): Pr
     res.status(500).json({ error: err.message, code: err.code, sql: err.sql });
   }
 }
+
+export async function debugStudents(req: AuthRequest, res: Response): Promise<void> {
+  try {
+    // Step 1: bare students
+    const [s] = await pool.execute('SELECT id, lrn, name FROM students LIMIT 3') as any[];
+    
+    // Step 2: join parents_guardians
+    const [pg] = await pool.execute(
+      'SELECT pg.student_id, pg.role, pg.name FROM parents_guardians pg LIMIT 3'
+    ) as any[];
+
+    // Step 3: join parent_accounts
+    const [pa] = await pool.execute(
+      'SELECT pa.lrn, pa.is_active FROM parent_accounts pa LIMIT 3'
+    ) as any[];
+
+    // Step 4: the full GROUP_CONCAT query on just 1 row
+    const [full] = await pool.execute(
+      `SELECT
+         s.id, s.lrn, s.name,
+         COALESCE(pa.is_active, 0) AS parent_is_active,
+         GROUP_CONCAT(
+           JSON_OBJECT(
+             'role',           pg.role,
+             'name',           pg.name,
+             'contact_number', pg.contact_number
+           )
+           SEPARATOR '||'
+         ) AS parents_guardians_raw
+       FROM students s
+       LEFT JOIN parents_guardians pg ON s.id = pg.student_id
+       LEFT JOIN parent_accounts pa ON s.lrn = pa.lrn
+       GROUP BY s.id
+       LIMIT 1`
+    ) as any[];
+
+    res.json({ students: s, parents_guardians: pg, parent_accounts: pa, full });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message, code: err.code, sql: err.sql, stack: err.stack });
+  }
+}
