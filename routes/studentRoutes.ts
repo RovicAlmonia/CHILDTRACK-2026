@@ -9,6 +9,7 @@ import {
 
 const router = Router();
 
+router.get('/students/debug', authMiddleware, debugStudents);
 router.get('/',    protect, getStudents);
 router.post('/',   protect, createStudent);
 router.get('/:id', protect, getStudentById);
