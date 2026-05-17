@@ -5,11 +5,12 @@ import {
   createStudent,
   getStudentById,
   activateParentAccount,
+  debugStudents,
 } from '../controllers/studentController';
 
 const router = Router();
 
-router.get('/students/debug', authMiddleware, debugStudents);
+router.get('/debug', protect, debugStudents);
 router.get('/',    protect, getStudents);
 router.post('/',   protect, createStudent);
 router.get('/:id', protect, getStudentById);
