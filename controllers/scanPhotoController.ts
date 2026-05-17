@@ -20,19 +20,15 @@ async function uploadToCloudinary(base64: string, studentName: string): Promise<
 export async function uploadScanPhoto(req: AuthRequest, res: Response): Promise<void> {
   try {
     const { student_name, status, photo_base64 } = req.body;
-
     if (!photo_base64 || !student_name) {
       res.status(400).json({ error: 'student_name and photo_base64 are required' });
       return;
     }
-
     const photoUrl = await uploadToCloudinary(photo_base64, student_name);
-
     await pool.execute(
       'INSERT INTO scan_photos (student_name, status, photo_path) VALUES (?, ?, ?)',
       [student_name, status || null, photoUrl]
     );
-
     res.status(201).json({ message: 'Photo saved', path: photoUrl });
   } catch (err) {
     console.error('uploadScanPhoto error:', err);
@@ -46,16 +42,22 @@ export async function getScanPhotos(req: AuthRequest, res: Response): Promise<vo
     const { student_name } = req.query;
     let query = 'SELECT * FROM scan_photos';
     let params: any[] = [];
-
     if (student_name) {
       query  += ' WHERE student_name LIKE ?';
       params  = [`%${student_name}%`];
     }
-
     query += ' ORDER BY captured_at DESC LIMIT 100';
-
     const [rows] = await pool.execute(query, params) as any[];
-    res.json(rows);
+
+    // Normalize photo_path: old rows have bare filenames, new rows have full Cloudinary URLs
+    const normalized = (rows as any[]).map((row) => ({
+      ...row,
+      photo_path: row.photo_path?.startsWith('http')
+        ? row.photo_path   // already a full Cloudinary URL — use as-is
+        : null,            // stale local path — return null so frontend shows fallback
+    }));
+
+    res.json(normalized);
   } catch (err) {
     console.error('getScanPhotos error:', err);
     res.status(500).json({ error: 'Server error' });
